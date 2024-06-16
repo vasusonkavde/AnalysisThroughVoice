@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Data Analysis Through Voice Assistant</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .voice-btn {
+            padding: 15px 30px;
+            font-size: 16px;
+            color: white;
+            background-color: #007BFF;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .voice-btn.active {
+            border-radius: 50%;
+            background-color: #28A745;
+            transform: scale(1.1);
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .voice-btn.pulsing {
+            animation: pulse 1s infinite;
+        }
+
+        .cont {
+           display: flex;
+         }
+
+        .table-responsive {
+            display: block;
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .bordered-table th, .bordered-table td {
+            min-width: 50px;
+            white-space: nowrap;
+        }
+
+        .bordered-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+            background-color: #fff;
+            color: #212529;
+            border: 1px solid #dee2e6;
+        }
+
+        .bordered-table th,
+        .bordered-table td {
+            padding: 0.75rem;
+            text-align: right;
+            border: 1px solid #dee2e6;
+        }
+
+        .bordered-table th {
+            background-color: #f8f9fa;
+        }
+
+        .bordered-table thead th {
+            vertical-align: bottom;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .bordered-table tbody tr:hover {
+            background-color: #f1f1f1;
+        }
+    </style>
+    <script>
+        function startRecognition() {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            const voiceBtn = document.getElementById('voice-btn');
+            voiceBtn.classList.add('active', 'pulsing');
+
+            recognition.onresult = (event) => {
+                const text = event.results[0][0].transcript;
+                document.getElementById('recognized-text').innerText = `You said: ${text}`;
+                voiceBtn.classList.remove('active', 'pulsing');
+
+                fetch('/process_command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ command: text })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.method === "sales_summary") {
+                          document.getElementById('output').innerHTML = renderTable(data.result);
+                    }
+                    else {
+                        document.getElementById('output').innerText = `Matched Method: ${data.method}\n\nOutput:\n${data.result}`;
+                    }
+                });
+            };
+
+            recognition.onspeechend = () => {
+                recognition.stop();
+                voiceBtn.classList.remove('active', 'pulsing');
+            };
+
+            recognition.onerror = (event) => {
+                console.error(event.error);
+                voiceBtn.classList.remove('active', 'pulsing');
+            };
+
+            recognition.start();
+        }
+        function renderTable(summaryText) {
+             const lines = summaryText.trim().split('\n');
+             const headers = lines[0].split(/\s+/);
+             const rows = lines.slice(1).map(line => line.trim().split(/\s+/));
+
+             let table = '<table class="bordered-table"><thead><tr>';
+             headers.forEach(header => {
+                 table += `<th>${header}</th>`;
+             });
+             table += '</tr></thead><tbody>';
+             rows.forEach(row => {
+                 table += '<tr>';
+                 row.forEach(cell => {
+                     table += `<td>${cell}</td>`;
+                 });
+                 table += '</tr>';
+             });
+             table += '</tbody></table>';
+             return table;
+        }
+    </script>
+</head>
+<body>
+    <div class="container mt-5 ml-1 row cont">
+            <div>
+                <h1>Sales Data Analysis</h1>
+                <p>Available Analysis You Can Perform<br>(Start Voice Recognition Say) :</p>
+                <ul>
+                    {% for method in method_names %}
+                        <li>{{ method }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="ml-3">
+                <button id="voice-btn" class="voice-btn ml-5" onclick="startRecognition()">Start Voice Recognition And Which Analysis You Want to Perform</button>
+                <p id="recognized-text" class="mt-3 ml-3"></p>
+                <pre id="output" class="mt-3 ml-3"></pre>
+            </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
